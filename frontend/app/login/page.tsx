@@ -40,7 +40,7 @@ export default function LoginPage() {
         className="w-full max-w-md bg-white p-8 rounded-xl shadow"
       >
         <h1 className="text-2xl font-bold mb-6 text-black text-center">
-          Welcome back
+          Bun Venit
         </h1>
 
         {error && (
