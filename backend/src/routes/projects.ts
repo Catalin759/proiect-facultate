@@ -5,42 +5,39 @@ import fs from "fs";
 import path from "path";
 
 export async function projectRoutes(fastify: FastifyInstance) {
-
   // =========================
-  // GET projects
+  // GET PROJECTS
   // =========================
   fastify.get(
     "/",
-    { preHandler: authMiddleware },
+    { preHandler: [authMiddleware] },
     async (request: any) => {
       const userId = request.user.userId;
 
       return prisma.project.findMany({
         where: { ownerId: userId },
-        orderBy: { id: "desc" },
+        orderBy: { createdAt: "desc" },
       });
     }
   );
 
   // =========================
-  // CREATE project
+  // CREATE PROJECT
   // =========================
   fastify.post(
     "/",
-    { preHandler: authMiddleware },
-    async (request: any, reply) => {
-      const { name } = request.body as { name: string };
+    { preHandler: [authMiddleware] },
+    async (request: any) => {
       const userId = request.user.userId;
+      const { name } = request.body as { name: string };
 
-      if (!name || name.trim().length < 3) {
-        return reply
-          .status(400)
-          .send({ message: "Nume proiect invalid" });
+      if (!name || name.length < 3) {
+        return { message: "Numele proiectului este prea scurt" };
       }
 
       return prisma.project.create({
         data: {
-          name: name.trim(),
+          name,
           ownerId: userId,
         },
       });
@@ -48,28 +45,23 @@ export async function projectRoutes(fastify: FastifyInstance) {
   );
 
   // =========================
-  // DELETE project
+  // DELETE PROJECT
   // =========================
   fastify.delete(
     "/:id",
-    { preHandler: authMiddleware },
-    async (request: any, reply) => {
-      const projectId = Number(request.params.id);
+    { preHandler: [authMiddleware] },
+    async (request: any) => {
       const userId = request.user.userId;
+      const projectId = Number(request.params.id);
 
-      const project = await prisma.project.findUnique({
-        where: { id: projectId },
+      await prisma.project.deleteMany({
+        where: {
+          id: projectId,
+          ownerId: userId,
+        },
       });
 
-      if (!project || project.ownerId !== userId) {
-        return reply.status(404).send({ message: "Proiect inexistent" });
-      }
-
-      await prisma.project.delete({
-        where: { id: projectId },
-      });
-
-      return { message: "Proiect șters" };
+      return { success: true };
     }
   );
 
@@ -78,38 +70,31 @@ export async function projectRoutes(fastify: FastifyInstance) {
   // =========================
   fastify.post(
     "/:id/upload",
-    { preHandler: authMiddleware },
+    { preHandler: [authMiddleware] },
     async (request: any, reply) => {
       const projectId = Number(request.params.id);
-      const userId = request.user.userId;
+      const data = await request.file();
 
-      const project = await prisma.project.findUnique({
-        where: { id: projectId },
-      });
-
-      if (!project || project.ownerId !== userId) {
-        return reply.status(404).send({ message: "Proiect inexistent" });
-      }
-
-      const file = await request.file();
-      if (!file) {
-        return reply.status(400).send({ message: "Fișier lipsă" });
+      if (!data) {
+        return reply.status(400).send({ message: "Nu a fost trimis niciun fișier" });
       }
 
       const uploadDir = path.join(process.cwd(), "uploads");
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir);
-      }
 
-      const buffer = await file.toBuffer();
-      const filePath = path.join(uploadDir, file.filename);
+      const fileName = `${Date.now()}-${data.filename}`;
+      const filePath = path.join(uploadDir, fileName);
 
-      fs.writeFileSync(filePath, buffer);
+      await new Promise((resolve, reject) => {
+        const stream = fs.createWriteStream(filePath);
+        data.file.pipe(stream);
+        stream.on("finish", resolve);
+        stream.on("error", reject);
+      });
 
       return {
-        message: "Fișier uploadat cu succes",
-        filename: file.filename,
-        url: `/uploads/${file.filename}`,
+        message: "Fișier încărcat cu succes",
+        fileName,
+        url: `/uploads/${fileName}`,
       };
     }
   );
