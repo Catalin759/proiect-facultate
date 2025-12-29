@@ -1,0 +1,19 @@
+# Node
+node_modules/
+dist/
+build/
+
+# Backend
+backend/dist/
+backend/uploads/
+
+# Frontend
+frontend/.next/
+frontend/node_modules/
+
+# Env
+.env
+.env.*
+
+# OS
+.DS_Store
